@@ -1,0 +1,19 @@
+pandas>=1.5.0
+numpy>=1.21.0
+faiss-cpu>=1.7.0
+sentence-transformers>=2.2.0
+openai>=1.0.0
+streamlit>=1.28.0
+gradio>=4.0.0
+plotly>=5.15.0
+
+# Dependências de teste
+pytest>=7.0.0
+pytest-mock>=3.10.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0
+pytest-timeout>=2.1.0
+psutil>=5.9.0
+
+# Dependências padrão do Python (já incluídas)
+pathlib2; python_version<"3.4"
