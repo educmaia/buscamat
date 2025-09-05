@@ -1,0 +1,246 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install build wheel
+    
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Create release notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << EOF
+        # 🚀 Buscador Semântico CATMAT ${{ steps.get_version.outputs.VERSION }}
+        
+        ## ✨ Novidades desta versão
+        
+        ### 🔍 Recursos de Busca
+        - Busca semântica avançada com embeddings E5-base-v2
+        - Motor FAISS HNSW para busca ultra-rápida
+        - Processamento em lote de múltiplos itens
+        - Integração com IA (OpenAI) para recomendações inteligentes
+        
+        ### 🖥️ Interface
+        - Interface web moderna com Gradio
+        - Suporte a download em múltiplos formatos (CSV, JSON, HTML)
+        - Relatórios detalhados com visualizações
+        - Processamento assíncrono com barra de progresso
+        
+        ### 🏗️ Arquitetura
+        - Sistema modular e extensível
+        - Componentes especializados e independentes
+        - Cache inteligente de embeddings e índices
+        - Tratamento robusto de erros
+        
+        ### 🐛 Correções
+        - Corrigido problema de "path too long" no Windows
+        - Melhorada performance na geração de embeddings
+        - Otimizações na interface de usuário
+        
+        ## 📦 Como Usar
+        
+        ### Instalação
+        \`\`\`bash
+        git clone https://github.com/educmaia/buscamat.git
+        cd buscamat
+        pip install -r requirements.txt
+        python app_gradio.py
+        \`\`\`
+        
+        ### Docker
+        \`\`\`bash
+        docker build -t buscamat .
+        docker run -p 7860:7860 buscamat
+        \`\`\`
+        
+        ## 🔗 Links Úteis
+        - 📖 [Documentação](https://github.com/educmaia/buscamat/blob/main/README.md)
+        - 🐛 [Reportar Bug](https://github.com/educmaia/buscamat/issues)
+        - 💡 [Sugerir Feature](https://github.com/educmaia/buscamat/discussions)
+        
+        ---
+        **Versão completa:** ${{ steps.get_version.outputs.VERSION }}  
+        **Data:** $(date +'%Y-%m-%d')  
+        **Commit:** \${GITHUB_SHA:0:7}
+        EOF
+        
+        echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+        cat release_notes.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        release_name: "🚀 Buscador Semântico CATMAT ${{ steps.get_version.outputs.VERSION }}"
+        body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+        draft: false
+        prerelease: false
+    
+    - name: Create deployment package
+      run: |
+        # Cria um pacote limpo para deploy
+        mkdir -p deploy-package
+        
+        # Copia arquivos essenciais
+        cp -r *.py deploy-package/
+        cp requirements.txt deploy-package/
+        cp README.md deploy-package/
+        cp catmat.csv deploy-package/
+        cp "Catmat - Agosto2025.xlsx" deploy-package/
+        
+        # Cria config de exemplo
+        cat > deploy-package/config.example.json << EOF
+        {
+          "model_name": "intfloat/e5-base-v2",
+          "hnsw_m": 32,
+          "hnsw_ef_construction": 200,
+          "hnsw_ef_search": 100,
+          "batch_size": 32,
+          "n_workers": 4,
+          "openai_api_key": "YOUR_OPENAI_API_KEY_HERE",
+          "openai_model": "gpt-4o-mini",
+          "max_tokens": 1000,
+          "temperature": 0.3
+        }
+        EOF
+        
+        # Cria script de instalação
+        cat > deploy-package/install.sh << EOF
+        #!/bin/bash
+        echo "🚀 Instalando Buscador Semântico CATMAT..."
+        
+        # Criar ambiente virtual
+        python -m venv venv
+        source venv/bin/activate  # No Windows: venv\\Scripts\\activate
+        
+        # Instalar dependências
+        pip install -r requirements.txt
+        
+        # Copiar config
+        if [ ! -f config.json ]; then
+            echo "📝 Copiando arquivo de configuração..."
+            cp config.example.json config.json
+            echo "⚠️  IMPORTANTE: Edite config.json com suas configurações!"
+        fi
+        
+        echo "✅ Instalação concluída!"
+        echo "💡 Para iniciar: python app_gradio.py"
+        EOF
+        
+        chmod +x deploy-package/install.sh
+        
+        # Cria arquivo ZIP
+        cd deploy-package
+        zip -r ../buscamat-${{ steps.get_version.outputs.VERSION }}.zip .
+        cd ..
+    
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./buscamat-${{ steps.get_version.outputs.VERSION }}.zip
+        asset_name: buscamat-${{ steps.get_version.outputs.VERSION }}.zip
+        asset_content_type: application/zip
+
+  docker-release:
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create optimized Dockerfile
+      run: |
+        cat > Dockerfile << EOF
+        FROM python:3.11-slim as builder
+        
+        WORKDIR /app
+        
+        # Install build dependencies
+        RUN apt-get update && apt-get install -y \\
+            gcc \\
+            g++ \\
+            && rm -rf /var/lib/apt/lists/*
+        
+        # Copy and install Python dependencies
+        COPY requirements.txt .
+        RUN pip install --user --no-cache-dir -r requirements.txt
+        
+        # Production image
+        FROM python:3.11-slim
+        
+        WORKDIR /app
+        
+        # Copy installed packages from builder
+        COPY --from=builder /root/.local /root/.local
+        
+        # Copy application code
+        COPY . .
+        
+        # Create non-root user
+        RUN useradd -m -u 1000 appuser && \\
+            chown -R appuser:appuser /app && \\
+            mkdir -p /app/resultados && \\
+            chown appuser:appuser /app/resultados
+        
+        USER appuser
+        
+        # Make sure PATH includes user packages
+        ENV PATH=/root/.local/bin:\$PATH
+        
+        # Health check
+        HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \\
+            CMD curl -f http://localhost:7860 || exit 1
+        
+        # Expose port
+        EXPOSE 7860
+        
+        # Run the application
+        CMD ["python", "app_gradio.py"]
+        EOF
+    
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Build and tag Docker image
+      run: |
+        docker build -t buscamat:latest .
+        docker tag buscamat:latest buscamat:${{ steps.get_version.outputs.VERSION }}
+        
+        echo "✅ Docker images built:"
+        docker images | grep buscamat
