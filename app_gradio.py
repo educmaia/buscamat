@@ -12,6 +12,10 @@ import pandas as pd
 import time
 import io
 import json
+import tempfile
+import shutil
+import os
+from datetime import datetime
 from buscador_catmat import BuscadorSemanticoCatmat
 
 # Variável global para o buscador
@@ -186,9 +190,6 @@ def processar_lote(lista_texto, top_k, usar_ia, progress=gr.Progress()):
 def preparar_csv_individual(csv_data):
     """Prepara arquivo CSV para download individual"""
     if csv_data:
-        import tempfile
-        import os
-        from datetime import datetime
         
         # Nome mais descritivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -207,9 +208,6 @@ def preparar_csv_individual(csv_data):
 def preparar_json_individual(resultados_df):
     """Prepara arquivo JSON para download individual"""
     if resultados_df is not None and not resultados_df.empty:
-        import tempfile
-        import os
-        from datetime import datetime
         
         json_data = resultados_df.to_json(orient='records', indent=2)
         
@@ -230,9 +228,6 @@ def preparar_json_individual(resultados_df):
 def preparar_csv_lote(csv_data):
     """Prepara arquivo CSV para download do lote"""
     if csv_data:
-        import tempfile
-        import os
-        from datetime import datetime
         
         # Nome mais descritivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -251,9 +246,6 @@ def preparar_csv_lote(csv_data):
 def preparar_json_lote(json_data):
     """Prepara arquivo JSON para download do lote"""
     if json_data:
-        import tempfile
-        import os
-        from datetime import datetime
         
         # Nome mais descritivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -272,9 +264,6 @@ def preparar_json_lote(json_data):
 def preparar_relatorio_lote(relatorio_html):
     """Prepara relatório HTML para download"""
     if relatorio_html:
-        import tempfile
-        import os
-        from datetime import datetime
         
         # Nome mais descritivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -292,16 +281,11 @@ def preparar_relatorio_lote(relatorio_html):
 
 def preparar_csv_especial(resultados_lote):
     """Prepara CSV especial para download"""
-    global buscador
     
     if resultados_lote is None or resultados_lote.empty:
         return gr.update(visible=False)
     
     try:
-        import tempfile
-        import shutil
-        import os
-        from datetime import datetime
         
         # Gera CSV especial no local original
         arquivo_csv = buscador.export_special_csv(resultados_lote)
